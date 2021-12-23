@@ -17,7 +17,7 @@ PICKUPS = []	# List of all pickup locations in REQUESTS
 #	Define Classes			
 class Request:
 # A request has: Pickup, Destination, Load, Distance 
-    def	_init_(self, pickup, dest, load):
+    def	__init__(self, pickup, dest, load):
         self.pickup = pickup
         self.dest = dest
         self.load = load
@@ -27,7 +27,7 @@ class Request:
     def set_pickup(self, pickup):
         if pickup != self.pickup: 
             self.pickup = pickup 
-        self.distance = DISTANCES[pickup][dest]
+        self.distance = DISTANCES[pickup][self.dest]
 
     def	_repr_(self):
         return "[%s, %s, %d T, %d km]" % (self.pickup, self.dest, self.load, self.distance)
@@ -50,18 +50,18 @@ class Trip:
         self.loadtime = request.loadtime
         
     def add_request(self, request):
-        self, dests. append(request.dest)
-        self, load += request, load
+        self, self.dests.append(request.dest)
+        self.load += request.load
         self.distance += request.distance
         self.loadtime += request.loadtime
 
     def swap_requests(self, x, y):
-        self.dests[x], self.dests[y] = self, dests [y], self.dests[x]
+        self.dests[x], self.dests[y] = self, dests[y], self.dests[x]
         self.recalculate_distance()
 
     def recalculate_distance(self):
         self, distance = 0
-        for i in range(len(self. dests)):
+        for i in range(len(self.dests)):
             self.distance += DISTANCES[self.pickup if i==0 else self.dests[i-l]][self.dests[i]]
 
     def	_repr_(self):
@@ -117,28 +117,29 @@ class Schedule:
     def read_input():
         global LOCATIONS, DISTANCES, DEPOT_DIST, REQUESTS, PICKUPS
         book = xlrd.open_workbook(FILENAME, encoding_override='cpl252')
-        sheet = book.sheetbyindex(0)
+        sheet = book.sheet_by_index(0)
         nrows = sheet.nrows
         ncols = sheet.ncols
         
-        LOCATIONS = [sheet, cell_value(r, 3) for r in range(2, nrows)]
+        LOCATIONS = [sheet.cell_value(r, 3) for r in range(2, nrows)]
         DISTANCES = {LOCATIONS[i] : {LOCATIONS[j] : sheet.cell_value(2 + i, 4 + j)
             for j in range(len(LOCATIONS))}
             for i in range(len(LOCATIONS))}
         DEPOT_DIST = {LOCATIONS[i] : sheet.cell_value(2 + i, 0) for i in range(PICKUPS_TOTAL)}	
-        DEPOTDIST = {k : v for k, v in sorted(DEPOT_DIST.items(), key=lambda item:item[l], reverse=True)}
+        DEPOTDIST = {k : v for k, v in sorted(DEPOT_DIST.items(), key=lambda item:item[1], reverse=True)}
         
         sheet2 = book.sheet_by_index(1)
         nrows2 = sheet2.nrows
         ncols2 = sheet2.ncols
-        
-        REQUESTS = [Request(*sheet2.row_values(i)) for i in range(l, nrows2)]
+        REQUESTS = [Request(*sheet2.row_values(i)) for i in range(1, nrows2)]
         PICKUPS = list(dict.fromkeys([r.pickup for r in REQUESTS]))
         
     read_input()
+    
+    
 import random, bisect, copy
 from datetime import datetime 
-from config import *
+# from config import *
 
 #	-greedy function					
 def greedy():
@@ -152,7 +153,7 @@ def greedy():
         pickup = pickups.pop()
 # 2. Get all the requests from that pickup, sorted by distance, descending
     Request_group = [r for r in REQUESTS if r.pickup == pickup and (r.distance/SPEED + LOADTIME) <= TIME_WINDOW]
-    request_group = sorted(request_group, key=lambda item:item.distance, reverse=^True)
+    request_group = sorted(request_group, key=lambda item:item.distance, reverse=True)
 # 3.Assign all these requests into trips
     while request_group != []:
 # 3a. Create a RCL
@@ -172,10 +173,8 @@ def greedy():
 # If the temp group is empty, then move on to the next trip
 # Otherwise, create a RCL and continue adding to the current trip
         while True:
-            temp_group = [Request(trip.dests[-1], r.dest, r.load)
-                for r in request_group
-                if r.load + trip.load <= MAX_LOADand ((DISTANCES [trip .pickup] [r.dest] + trip.distance)/SPEED + trip.loadtime + LOADTIME) <= TIME WINDOW]
-            if tempgroup == []:
+            temp_group = [Request(trip.dests[-1], r.dest, r.load) for r in request_group if r.load + trip.load <= MAXLOAD and ((DISTANCES [trip .pickup][r.dest] + trip.distance)/SPEED + trip.loadtime + LOADTIME) <= TIME_WINDOW]
+            if temp_group == []:
                 trips, append(trip)
                 break
         temp_group = sorted(temp_group, key=lambda item:item. distance, reverse = True) 
@@ -185,65 +184,66 @@ def greedy():
         request = temp_group[random.randint(rcl, len(temp_group)-l)]
         trip.add_request(request)
         request_group.pop(next(x for x, val in enumerate(request_group) if val.dest == request.dest))
-# ******************** Merge trips into routes*********************
-# 4. Merge trips that have the shortest intermediate distance until reaching TIMEWINDOW
-schedule = Schedule()
-depot_dist_keys = list(DEPOT_DIST.keys())
-while trips != []:
-    truck = None
-# 4a. Take out a trip whose pickup has the smallest depot_dist
-    found = False
-    while not found:
-        pickup = depot_dist_keys[-l]
-        for i in range(len(trips)):
-            if trips[i] .pickup == pickup:
-# 4b. Based on the load of this trip, select truck with the appropriate capacity
-                truck = Truck(CAPACITIES[bisect.bisect_left(CAPACITIES,trips[i].load)])
-# 4c. Add the trip to a route
-                route = Route(trips.pop(i), truck)
-                found = True
-                break
-            if not found:
-                depot_dist_keys.pop()
-#	4d. Keep merging until reaching TIME_WINDOW
-#	Only merge with trips that satisfy truck's capacity
-    while True:
-        last_dest = route.trips[-1].dests[-1]
-        pickup_dist = {k : v for k, V in sorted(DISTANCES[last_dest].items(), key = lambda item : item[l], reverse = True)}
-        merged = False
-        while not merged and pickup_dist != {}:
-            item = pickup_dist.popitem()
-            for i in range(len(trips)):
-                if trips[i].pickup == item[0]:
-                    if trips[i].load <= truck.capacity and ((item[l] + trips [i].distance + route.distance)/SPEED + route.loadtime + trips[i].loadtime) <= TIME__WINDOW:
-                        route.add_trip(trips.pop(i))
-                        merged = True
+        # ******************** Merge trips into routes*********************
+        # 4. Merge trips that have the shortest intermediate distance until reaching TIMEWINDOW
+        schedule = Schedule()
+        depot_dist_keys = list(DEPOT_DIST.keys())
+        while trips != []:
+            truck = None
+        # 4a. Take out a trip whose pickup has the smallest depot_dist
+            found = False
+            while not found:
+                pickup = depot_dist_keys[-l]
+                for i in range(len(trips)):
+                    if trips[i] .pickup == pickup:
+        # 4b. Based on the load of this trip, select truck with the appropriate capacity
+                        truck = Truck(CAPACITIES[bisect.bisect_left(CAPACITIES,trips[i].load)])
+        # 4c. Add the trip to a route
+                        route = Route(trips.pop(i), truck)
+                        found = True
                         break
-        if not merged:
-            break
-#	4e. Now that a route is completed, we add it to the schedule
-    Schedule.add_route(route)
-#	5. Return schedule to phase 2
-    return schedule
+                    if not found:
+                        depot_dist_keys.pop()
+        #	4d. Keep merging until reaching TIME_WINDOW
+        #	Only merge with trips that satisfy truck's capacity
+            while True:
+                last_dest = route.trips[-1].dests[-1]
+                pickup_dist = {k : v for k, V in sorted(DISTANCES[last_dest].items(), key = lambda item : item[l], reverse = True)}
+                merged = False
+                while not merged and pickup_dist != {}:
+                    item = pickup_dist.popitem()
+                    for i in range(len(trips)):
+                        if trips[i].pickup == item[0]:
+                            if trips[i].load <= truck.capacity and ((item[l] + trips [i].distance + route.distance)/SPEED + route.loadtime + trips[i].loadtime) <= TIME__WINDOW:
+                                route.add_trip(trips.pop(i))
+                                merged = True
+                                break
+                if not merged:
+                    break
+        #	4e. Now that a route is completed, we add it to the schedule
+            Schedule.add_route(route)
+        #	5. Return schedule to phase 2
+            return schedule
     
 import random, copy, math
 
-from phase 1 import greedy
+from phase_1 import greedy
 #	Define global variables and parameters
 
 SCHEDULE = greedy()
 INITIAL_TEMP = 1000
 DELTA = 0.95
 MAX_ITER = 7000
+
 def grasp():
     print_schedule(SCHEDULE)
     temperature = INITIAL_TEMP
     k=l
-    best SCHEDULE.distance
+    # best SCHEDULE.distance
     i = 0
     iterations = [SCHEDULE]
     print('Initial distance: %.2f km.' %(SCHEDULE.distance))
-    while temperature > l and k < MAX_ITER.:
+    while temperature > l and k < MAX_ITER :
         sched = copy.deepcopy(iterations[-l])
         for route in sched.routes:
             sched.distance -= route.distance
